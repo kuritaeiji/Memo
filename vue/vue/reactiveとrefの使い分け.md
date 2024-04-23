@@ -1,0 +1,175 @@
+# reactive と ref の使い分け
+
+## ref と reactive の違い
+
+リアクティビティーが維持される条件はgetterとsetterにtrack関数とtrigger関数が定義されていること。
+
+### ref
+
+```typescript
+const ref<T> = (target: T): Ref<T> => {
+  return {
+    value: typeof target === 'object' ? reactive(target) : target,
+    get value() {
+      // Subscriberを登録
+      track(this, 'value')
+      return this.value
+    },
+    set value(newValue) {
+      this.value = newValue
+      // Subscriberを呼び出す
+      trigger(this, 'value')
+    }
+  }
+}
+```
+
+- プリミティブな値やオブジェクトなどすべての値を保持可能
+- 値そのものを上書き可能（プリミティブな値の場合は value を書き換えるだけ、オブジェクトの場合はオブジェクトを reactive 関数で reactive にしてから value にセットする）
+- プリミティブな値の分割代入は不可（各プロパティーは単なるプリミティブ値なのでgetter と setter で track 関数や trigger 関数が実行されない）
+- オブジェクトや配列の分割代入は可能（オブジェクトや配列はreactive関数によってリアクティブ化されているためgetterとsetterでtrack関数やtrigger関数が実行されるため）
+- ネストしたオブジェクトを使用可能（ネストしたオブジェクトも再帰的に reactive 関数によって reactive になるため）
+
+### reactive
+
+```typescript
+const reactive<T> = (target: T): T => {
+  return new Proxy(target, {
+    get(obj, property) {
+      track(obj, property)
+      return obj[property]
+    },
+    set(obj, property, newValue) {
+      obj[property] = newValue
+      trigger(obj, property)
+    }
+  })
+}
+```
+
+- オブジェクトや配列のみ値を保持可能
+- 値そのものの上書き不可（上書きした場合 Proxy ではなく単なるオブジェクトになるから）
+- 分割代入は不可（オブジェクトの各プロパティーは単なるプリミティブ値やオブジェクトだから）
+- ネストしたオブジェクト使用不可（ネストしたオブジェクトはリアクティブにならず、getterとsetterにtrack関数とtrigger関数が定義されていないから）
+
+## 上書き
+
+### reactive
+
+```typescript
+const form = reactive({ email: 'aaa@example.com', password: 'password' })
+const resetForm = () => {
+  // getterとsetterにtrackとtriggerが定義されていないため、リアクティビティーが消失する
+  // formにはProxyではなく単なるオブジェクトが代入される
+  form = { email: '', password: '' }
+}
+```
+
+### ref
+
+```typescript
+const form = ref({ email: 'aaa@example.com', password: 'password' })
+const resetForm = () => {
+  // form.valueプロパティーのsetterでtrigger関数が実行され仮想DOMが更新されるため、リアクティビティーは維持される
+  // formにはreactive({ email: '', password: '' })が代入される
+  form.value = { email: '', password: '' }
+}
+```
+
+## 分割代入
+
+### reactive
+
+```typescript
+const form = reactive({ email: 'aaa@example.com', password: 'password' })
+// emailにはただのプリミティブな値が代入されるため、track関数とtrigger関数が実行されないため、リアクティビティーは消失する
+const email = form.email
+```
+
+toRefs 関数を使用するとリアクティブにできる
+
+```typescript
+toRefs<T> = (target: T) => { [K in keyof T]: Ref<T[K]> }
+const form = reactive({ email: 'aaa@example.com', password: 'password' })
+const formRefs = toRefs(form)
+
+<div>{{ formRefs.email }}</div>
+```
+
+```typescript
+const toRefs = (target: object) => {
+  for (key in target) {
+    target[key] = {
+      value: target[key],
+      get value() {
+        // targetがreactiveオブジェクトの場合、reactiveオブジェクトのProxyのゲッターを呼び出しているのでtrack関数が実行される。よってreactiveオブジェクトとリアクティビティーが維持される。
+        return target[key] // 例）return form.email
+      },
+      set value(newValue) {
+        // targetがreactiveオブジェクトの場合、reactiveオブジェクトのProxyのセッターを呼び出しているのでtrigger関数が実行される。よってreactiveオブジェクトとリアクティビティーが維持される。
+        target[key] = newValue // 例）form.email = newValue
+      }
+    }
+  }
+  return target
+}
+```
+
+### ref
+
+```typescript
+const form = ref({
+  email: 'aaa@example.com',
+  password: 'password',
+  nestObj: { count: 1 }
+})
+// emailにはただのプリミティブな値が代入されるため、track関数とtrigger関数が実行されないため、リアクティビティーは消失する
+const email = form.email
+// nestObjはreactiveなオブジェクトなので、ゲッターとセッターによってtrack関数とtrigger関数が実行されつので、リアクティビティーは維持される
+const { nestObj } = form.value
+// countにはただのプリミティブな値が代入されるため、track関数とtrigger関数が実行されないため、リアクティビティーは消失する
+const { count } = form.value.nestObj
+// countはrefオブジェクトであり、ゲッターとセッター関数内でnestObj.countを呼び出し、nestObjのゲッターとセッター関数を呼び出すためtrack関数とtrigger関数が実行されるのでリアクティビティーは維持される
+const { count } = toRefs(form.value.nestObj)
+```
+
+toRefs 関数を使用するとリアクティブにできる
+
+## ネストしたオブジェクト
+
+### reactive
+
+```typescript
+const state = {
+  nestObj: {
+    count: 0
+  }
+}
+const incrementCount = () => {
+  // nestObjはリアクティブなオブジェクトではなくただのオブジェクトなので、ゲッター関数とセッター関数でtrack関数とtrigger関数が実行されない
+  // よってリアクティビティーは消失する
+  state.nestObj.count = state.nestObj.count + 1
+}
+```
+
+### ref
+
+```typescript
+const state = {
+  nestObj: {
+    count: 0
+  }
+}
+const incrementCount = () => {
+  // nestObjはリアクティブなオブジェクトなので、ゲッター関数とセッター関数でtrack関数とtrigger関数が実行される
+  // よってリアクティビティーが維持される
+  state.nestObj.count = state.nestObj.count + 1
+  isReactive(state.nestObj) // true
+}
+```
+
+## 結論
+
+ref のみ使用するほうが良い。  
+ただし ref でもプリミティブな値を分割代入したい場合、toRefs を使用しない限り分割代入はできない。  
+ref の値を上書きする場合は refObj.value にオブジェクトを代入するので value のゲッターとセッターが track 関数と trigger 関数を実行してくれるため上書きできる。reactive の場合は reactive を代入している変数自体にオブジェクトを代入するためゲッターとセッターの track 関数と trigger 関数が実行されなくなるので上書きできない。
