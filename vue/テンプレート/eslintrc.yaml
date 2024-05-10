@@ -1,0 +1,16 @@
+root: true
+parser: vue-eslint-parser
+plugins:
+  - '@typescript-eslint'
+parserOptions:
+  parser: '@typescript-eslint/parser'
+  project: ./tsconfig.json
+  extraFileExtensions: ['.vue']
+extends:
+  - airbnb-base
+  - airbnb-typescript/base
+  - '@nuxtjs/eslint-config-typescript'
+  - 'prettier'
+rules:
+  'import/extensions':
+    - off

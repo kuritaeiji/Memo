@@ -1,0 +1,29 @@
+{
+  "name": "Go",
+  "dockerComposeFile": "./docker-compose.yaml",
+  "service": "app",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
+  "workspaceFolder": "/go/app",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "mhutchie.git-graph",
+        "golang.go",
+        "ms-azuretools.vscode-docker",
+        "oderwat.indent-rainbow",
+        "xyz.local-history",
+        "esbenp.prettier-vscode",
+        "timonwong.shellcheck",
+        "redhat.vscode-yaml",
+        "mosapride.zenkaku",
+        "github.vscode-github-actions",
+        "ms-vscode.makefile-tools",
+        "Gruntfuggly.todo-tree"
+      ],
+      "settings": {
+        "go.formatTool": "goimports",
+        "go.useLanguageServer": true
+      }
+    }
+  }
+}

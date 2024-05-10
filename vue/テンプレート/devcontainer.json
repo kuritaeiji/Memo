@@ -1,0 +1,27 @@
+{
+  "name": "Vue",
+  "dockerFile": "./Dockerfile",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
+  "workspaceFolder": "/app",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "esbenp.prettier-vscode",
+        "rvest.vs-code-prettier-eslint",
+        "stylelint.vscode-stylelint",
+        "antfu.vite",
+        "Vue.volar",
+        "redhat.vscode-yaml",
+        "mosapride.zenkaku",
+        "Gruntfuggly.todo-tree",
+        "mrmlnc.vscode-scss",
+        "xyz.local-history",
+        "oderwat.indent-rainbow",
+        "mhutchie.git-graph",
+        "ms-azuretools.vscode-docker",
+        "streetsidesoftware.code-spell-checker",
+        "wmaurer.change-case"
+      ]
+    }
+  }
+}

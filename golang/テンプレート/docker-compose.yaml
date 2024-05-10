@@ -1,0 +1,41 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/go/app
+    networks:
+      backend:
+        ipv4_address: 192.168.2.2
+    ports:
+      - 8080:8080
+    depends_on:
+      - db
+    tty: true
+    stdin_open: true
+    entrypoint: ['/bin/bash']
+
+  db:
+    image: mysql:8.0.35-debian
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: db
+    volumes:
+      # 匿名ボリューム
+      - /var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./my.cnf:/etc/mysql/conf.d/my.cnf
+    networks:
+      backend:
+        ipv4_address: 192.168.2.3
+    ports:
+      - 3307:3306
+
+networks:
+  backend:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.2.0/24
