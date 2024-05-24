@@ -2,7 +2,6 @@
   "name": "Go",
   "dockerComposeFile": "./docker-compose.yaml",
   "service": "app",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
   "workspaceFolder": "/go/app",
   "customizations": {
     "vscode": {
