@@ -1,7 +1,7 @@
 {
   "name": "Vue",
-  "dockerFile": "./Dockerfile",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
+  "dockerComposeFile": "./docker-compose.yaml",
+  "service": "app",
   "workspaceFolder": "/app",
   "customizations": {
     "vscode": {
