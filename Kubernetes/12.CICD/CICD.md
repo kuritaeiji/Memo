@@ -18,9 +18,10 @@ Kubernetes の CI/CD には 2 つの方法論がある。
 ## CIOps
 
 1. 開発者がリポジトリに変更を main ブランチにマージする
-2. GitHubActions がテスト・Docker イメージのビルド・Docker レジストリへのイメージの Push を行う
-3. GithubActions がマニフェストファイルのイメージタグを変更しコミットする
-4. GithubActions がマニフェストファイルを Kubernetes に適用する
+2. ソースリポジトリの GitHubActions がテスト・Docker イメージのビルド・Docker レジストリへのイメージの Push を行う
+3. ソースリポジトリの GithubActions がマニフェストファイルのイメージタグを変更した PullRequest をマニフェストリポジトリに対して作成する
+4. 開発者がマニフェストリポジトリへの PullRequest をマージする
+5. マニフェストリポジトリの GithubActions がマニフェストファイルを Kubernetes に適用する
 
 ![CIOps](../image/CIOps.png)
 
