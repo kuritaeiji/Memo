@@ -49,6 +49,8 @@ const posts = await res.json()
 4. 一旦 resolved 状態になった Suspense コンポーネントはデフォルトスロットのルートノードが置換された場合にのみ pending 状態になる
 5. 再度 pending 状態になった場合はフォールバックコンテンツをすぐに表示せず、timeout props で指定した時間が経過しても resolved 状態にならなかった場合のみフォールバックコンテンツを表示する
 
+つまり初回レンダリング時と default スロットのルートノードが置換された際に Pending 状態になり、fallback スロットを表示する。
+
 ## イベント
 
 Suspense コンポーネントは pending resolve fallback の 3 種類のイベントを発行する
@@ -91,7 +93,7 @@ onErrorCaptured((error) => {
 </template>
 ```
 
-上記コードの場合、初回レンダリング時は全ての非同期コンポーネントが解決されるまで fallback スロットコンテンツを表示する。ただし、一旦 Resolved 状態になった Suspense コンポーネントはルートノードが変化した場合のみ再度 Pending 状態になり fallback コンテンツを表示する。よって OuterComponent を変更した場合は fallback コンテンツを表示するが、InnerComponent を変更した場合はルートノードの変更ではないので fallback コンテンツを表示しない。  
+上記コードの場合、初回レンダリング時は全ての非同期コンポーネントが解決されるまで fallback スロットコンテンツを表示する。ただし、一旦 Resolved 状態になった Suspense コンポーネントはルートノードが置換された場合のみ再度 Pending 状態になり fallback コンテンツを表示する。よって OuterComponent を変更した場合は fallback コンテンツを表示するが、InnerComponent を変更した場合はルートノードの置換ではないので fallback コンテンツを表示しない。  
 これを直すにはネストした非同期コンポーネントを Suspense コンポーネントルートノードにするために Suspense コンポーネントをもう一つ記述する。
 
 ```HTML
@@ -128,26 +130,51 @@ onErrorCaptured((error) => {
 
 Suspense コンポーネントのルートノードが置換されると、Suspense コンポーネントは再度 Pending 状態になる。よって default スロットのルートノードを動的コンポーネントにすることでルートノードが置換され fallback コンテンツが表示されるようにする。timeout props を設定することでルートノードが置換され再度 Pending 状態になったときに即座に fallback コンテンツが表示されるようにしている
 
-## 疑似コード
+## Suspense の疑似コード
 
 以下 Suspense を使用した場合の`<script setup>`を Vue ランタイムがマウントするまでの疑似コード
 
 ```TypeScript
 // 実行順序
 (async () => {
-  // 1
-  const res = await fetch(...)
-  // 3
-  const posts = await res.json()
+  const res = await fetch(...)　// 1
+  const posts = await res.json()　// 3
 })()
   .then(() => {
-    // 4
-    unmountFallback()
+    unmountFallback()　// 4
     mountComponent()
   })
 
-// 2
-mountFallback()
+mountFallback() // 2
 ```
 
-`<script setup>`内のコードは setup ライフサイクル時に実行される。トップレベルに await を記述すると await で指定した Promise オブジェクトが Resolve されるのを待ってから mount ライフサイクルに移行する。（setup 以下に記述されたコードは async 即時実行関数として実行され、全ての Promise オブジェクトが Resolved になるまでは fallback スロットのコンテンツをマウントする。関数内の全ての Promise オブジェクトが Resolved された後に async 即時実行関数が返却する Promise オブジェクトが Pending から Fullfilled になり、マイクロタスクとして発行された then メソッド内のコールバック関数が fallback スロットをアンマウントし、default スロットをマウントする）
+`<script setup>`内のコードは setup ライフサイクル時に実行される。`<script setup>`のトップレベルに await を記述すると await で指定した Promise オブジェクトが Resolve されるのを待ってから mount ライフサイクルに移行する。（setup 以下に記述されたコードは async 即時実行関数として実行され、全ての Promise オブジェクトが Resolved になるまでは fallback スロットのコンテンツをマウントする。関数内の全ての Promise オブジェクトが Resolved された後に async 即時実行関数が返却する Promise オブジェクトが Pending から Fullfilled になり、マイクロタスクとして発行された then メソッド内のコールバック関数が fallback スロットをアンマウントし、default スロットをマウントする）
+
+## `<script setup>`の疑似コード
+
+```Vue
+<script setup lang="ts">
+const res = await fetch(...)
+const posts = await res.json()
+</script>
+
+<template>
+  <div>
+    {{ posts }}
+  </div>
+</template>
+```
+
+疑似コード
+
+```TypeScript
+(async () => {
+  const res = await fetch(...)
+  const posts = await res.json()
+})()
+  .then(() => {
+    mountComponent()
+  })
+```
+
+`<script setup>`内のコードを async 即時実行関数として実行し、async 即時実行関数が返却する Promise オブジェクトが Fullfilled 状態になると mountComponent 関数を実行してコンポーネントを DOM に挿入する。

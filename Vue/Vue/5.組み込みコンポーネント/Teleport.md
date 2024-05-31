@@ -24,6 +24,7 @@ const openModal = () => {
   isShow.value = true
   // モーダルを開いたときにコンポーザブル関数で管理するモーダル数を+1する
   plusModalCount()
+  // computedではないのでmodalCountが変更されてもopenModal関数は再実行されない
   zIndex.value = modalCount.value + 10
 }
 const closeModal = () => {
