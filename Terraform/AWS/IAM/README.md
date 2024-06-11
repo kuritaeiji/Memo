@@ -14,8 +14,8 @@ IAM には以下の 3 種類のアイデンティティーが存在する。
 
 IAM User にポリシーをアタッチする際には aws_iam_user_policy と aws_iam_user_policy_attachment が使用できる
 
-- aws_iam_user_policy: オリジナルのポリシーをアタッチするために使用される
-- aws_iam_user_policy_attachment: 管理ポリシーをアタッチするために使用される
+- aws_iam_user_policy: ポリシードキュメント（data aws_iam_policy_document）をアタッチするために使用される
+- aws_iam_user_policy_attachment: ポリシー（resource aws_iam_policy）をアタッチするために使用される
 
 ![IAM User-ER図](../image/IAM%20User-ER図.png)
 
@@ -25,8 +25,8 @@ IAM Group も IAM User とほぼ同じ
 
 IAM Group にポリシーをアタッチする際には aws_iam_group_policy と aws_iam_group_policy_attachment が使用できる
 
-- aws_iam_group_policy: オリジナルのポリシーをアタッチするために使用される
-- aws_iam_group_policy_attachment: 管理ポリシーをアタッチするために使用される
+- aws_iam_group_policy: ポリシードキュメントをアタッチするために使用される
+- aws_iam_group_policy_attachment: ポリシーをアタッチするために使用される
 
 ![IAM Group-ER図](../image/IAM%20Group-ER図.png)
 
@@ -48,7 +48,16 @@ IAM Role を引き受けることができるもの
 
 IAM Role にポリシーをアタッチする際には aws_iam_role_policy と aws_iam_role_policy_attachment が使用できる
 
-- aws_iam_role_policy: オリジナルのポリシーをアタッチするために使用される
-- aws_iam_role_policy_attachment: 管理ポリシーをアタッチするために使用される
+- aws_iam_role_policy: ポリシードキュメントをアタッチするために使用される
+- aws_iam_role_policy_attachment: ポリシーをアタッチするために使用される
 
 ![IRM Role-ER図](../image/IAM%20Role-ER図.png)
+
+## IAM Policy
+
+- data "aws_iam_policy_document": IAM ポリシーのドキュメントを作成する。ただし AWS 上にポリシーを作成するのではなくあくまでJSON文字列を作成しているだけ。
+- resource "aws_iam_policy": IAM ポリシーを作成する。AWS 上に IAM ポリシーリソースを作成する。IAMポリシードキュメントを指定する必要がある。
+
+また、IAM ポリシードキュメントは`source_policy_documents`にポリシードキュメントを指定すると指定したポリシードキュメントを継承できる。
+
+![IAM Policy-ER図](../image/IAM%20Policy-ER図.png)
