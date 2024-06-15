@@ -6,7 +6,7 @@ VPC には以下のリソースがある
 - インターネットゲートウェイ
 - サブネット
 - ルートテーブル
-- NAT ゲートウェイ
+- NAT ゲートウェイ（パブリックサブネットに配置する）
 
 ![VPC図](../image/VPC図.png)
 
@@ -82,6 +82,43 @@ resource "aws_route" "public" {
 resource "aws_route_table_association" "public" {
   subnet_id = aws_subnet.public.id
   route_table_id = aws_route_table.public.id
+}
+```
+
+## NAT ゲートウェイ
+
+NAT ゲートウェイはプライベートサブネットに配置されたリソースがインターネット通信できるよう IP マスカレードする。NAT ゲートウェイをパブリックサブネットに配置し、プライベートサブネットのルートテーブルのデフォルトゲートウェイを NAT ゲートウェイに向けることで通信が可能になる。
+
+```main.tf
+resource "aws_eip" "nat_gateway_1a" {
+  domain = "vpc"
+  depends_on = [ aws_internet_gateway.example ]
+}
+
+resource "aws_nat_gateway" "public_subnet_1a" {
+  allocation_id = aws_eip.nat_gateway_1a.id
+  # パブリックサブネットに配置する
+  subnet_id = aws_subnet.public_1a.id
+
+  tags = {
+    Name = "public-subnet-1a-ng"
+  }
+
+  depends_on = [ aws_internet_gateway.example ]
+}
+
+resource "aws_route_table" "private_1a" {
+  vpc_id = aws_vpc.example.id
+
+  tags = {
+    Name = "private-subnet-1a-rt"
+  }
+}
+
+resource "aws_route" "nat_1a" {
+  route_table_id = aws_route_table.private_1a.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id = aws_nat_gateway.public_subnet_1a.id
 }
 ```
 
