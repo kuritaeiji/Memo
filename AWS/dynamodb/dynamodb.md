@@ -168,3 +168,230 @@ DynamoDB のトランザクションの分離レベルは Serializable。よっ�
 | BatchGetItem   | コミット済み読み取り              |
 | Query          | コミット済み読み取り              |
 | Scan           | コミット済み読み取り              |
+
+## DynamoDB のデータモデリング
+
+- シングルテーブル設計: 1 つのテーブルに複数のエンティティーを含める
+  - SK にエンティティー名を指定して各エンティティーを区別する
+  - 複合ソートキーを使用してクエリの柔軟性を上げることができる
+- マルチテーブル設計: 1 つのテーブルに 1 つのエンティティー
+
+### 1. 複合ソートキー
+
+クエリとして複数の属性を指定してフィルタリングできるようにソートキーに複数の属性を指定する
+
+<table>
+  <thead>
+    <th>PK</th>
+    <th>SK</th>
+    <th>name</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="4">UserId</td>
+      <td>Cart#Active</td>
+      <td>Apple</td>
+    </tr>
+    <tr>
+      <td>Cart#Active</td>
+      <td>Banana</td>
+    </tr>
+    <tr>
+      <td>Cart#Saved</td>
+      <td>Oranges</td>
+    </tr>
+    <tr>
+      <td>Wish</td>
+      <td>Carrots</td>
+    </tr>
+  </tbody>
+</table>
+
+### 2. 項目コレクション
+
+1 つのテナントに対して 1 つのエンティティーの項目を複数保持する。例）ユーザー ID に対して複数の写真項目を保持する
+
+<table>
+  <thead>
+    <th>PK</th>
+    <th>SK</th>
+    <th>ImageURL</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="2">UserOne</td>
+      <td>PhotoId0001</td>
+      <td>http://s3.amazonaws.com/bucket/example01.png</td>
+    </tr>
+    <tr>
+      <td>PhotoId0002</td>
+      <td>http://s3.amazonaws.com/bucket/example02.png</td>
+    </tr>
+    <tr>
+      <td rowspan="2">UserTwo</td>
+      <td>PhotoId0003</td>
+      <td>http://s3.amazonaws.com/bucket/example03.png</td>
+    </tr>
+    <tr>
+      <td>PhotoId0004</td>
+      <td>http://s3.amazonaws.com/bucket/example04.png</td>
+    </tr>
+  </tbody>
+</table>
+
+### 3. グローバルセカンダリーインデックス
+
+テーブルの PK とは異なる PK を指定して読み取りクエリを実行したい場合はグローバルセカンダリーインデックスを使用する。
+
+ポストテーブル
+
+<table>
+  <thead>
+    <th>PK</th>
+    <th>UserId</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td >Post01</td>
+      <td rowspan="3">User01</td>
+    </tr>
+    <tr>
+      <td>Post02</td>
+    </tr>
+    <tr>
+      <td>Post03</td>
+    </tr>
+    <tr>
+      <td>Post04</td>
+      <td>User02</td>
+    </tr>
+  </tbody>
+</table>
+
+グローバルセカンダリーインデックス
+
+<table>
+  <thead>
+    <th>PK(UserId)</th>
+    <th>PostId</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="3">User01</td>
+      <td>Post01</td>
+    </tr>
+    <tr>
+      <td>Post02</td>
+    </tr>
+    <tr>
+      <td>Post03</td>
+    </tr>
+    <tr>
+      <td>User02</td>
+      <td>Post04</td>
+    </tr>
+  </tbody>
+</table>
+
+ポストテーブルでは`getPostsByUser`のようなクエリは実行できないためユーザー ID を PK としたグローバルセカンダリーインデックスを作成する
+
+### 4. ローカルセカンダリーインデックス
+
+ローカルセカンダリーインデックスでは項目コレクションをソートする属性を変更したい場合に使用する。
+
+カラムテーブル
+
+<table>
+  <thead>
+    <th>PK(MetadataId)</th>
+    <th>SK(Name)</th>
+    <th>Type</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="3">Meta01</td>
+      <td>Col01</td>
+      <td>VARCHAR</td>
+    </tr>
+    <tr>
+      <td>Col02</td>
+      <td>INT</td>
+    </tr>
+    <tr>
+      <td>Col03</td>
+      <td>CHAR</td>
+    </tr>
+    <tr>
+      <td>Meta02</td>
+      <td>Col01</td>
+      <td>VARCHAR</td>
+    </tr>
+  </tbody>
+</table>
+
+ローカルセカンダリーインデックス
+
+<table>
+  <thead>
+    <th>PK(MetaId)</th>
+    <th>SK(Type)</th>
+    <th>Name</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="3">Meta01</td>
+      <td>CHAR</td>
+      <td>Col03</td>
+    </tr>
+    <tr>
+      <td>INT</td>
+      <td>Col02</td>
+    </tr>
+    <tr>
+      <td>VARCHAR</td>
+      <td>Col01</td>
+    </tr>
+    <tr>
+      <td>Meta02</td>
+      <td>VARCHAR</td>
+      <td>Col01</td>
+    </tr>
+  </tbody>
+</table>
+
+メタデータテーブルのみだと各メタデータに属するカラムを名前でのソートしかできないが、ローカルセカンダリーインデックスを定義することでデータ型でのソートもできる。
+
+### 5. TTL
+
+TTL を使用することで有効期限をすぎると数日以内にデータを削除できる。期限切れの項目削除は非同期で行われるため期限きっかりに削除したい場合は使用不可。
+
+タイムラインテーブル
+
+<table>
+  <thead>
+    <th>PK(UserId)</th>
+    <th>SK(MessageTimestamp)</th>
+    <th>ttl</th>
+    <td>Message</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="3">UserId01</td>
+      <td>2024-01-01 00:00:00</td>
+      <td>170000000</td>
+      <td>Hello</td>
+    </tr>
+    <tr>
+      <td>2024-01-02 00:00:00</td>
+      <td>170000000</td>
+      <td>Message</td>
+    </tr>
+    <tr>
+      <td>2024-01-03 00:00:00</td>
+      <td>170000000</td>
+      <td>World</td>
+    </tr>
+  </tbody>
+</table>
+
+TTL を過ぎても削除されていない項目を読み取りクエリから除外したい場合はフィルターを使用する
