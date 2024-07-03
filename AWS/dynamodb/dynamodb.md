@@ -140,21 +140,30 @@ DynamoDB のトランザクションの分離レベルは Serializable。よっ�
 
 以下にクライアント A が先にトランザクションを開始しクライアント B が後から同じ項目に書き込みまたは読み込みを実行した場合の挙動パターンを示す。
 
-| クライアント A           | クライアント B           | 結果                                        |
-| :----------------------- | :----------------------- | :------------------------------------------ |
-| トランザクション書き込み | トランザクション書き込み | クライアント B はロック開放まで書き込み待機 |
-| トランザクション書き込み | トランザクション読み込み | クライアント B はロック開放まで読み込み待機 |
-| トランザクション書き込み | 書き込み                 | クライアント B は即書き込む                 |
-| トランザクション書き込み | 読み込み                 | クライアント B は即読み込む                 |
-| トランザクション読み込み | トランザクション書き込み | クライアント B はロック開放まで書き込み待機 |
-| トランザクション読み込み | トランザクション読み込み | クライアント B はロック開放まで読み込み待機 |
-| トランザクション読み込み | 書き込み                 | クライアント B は即書き込む                 |
-| トランザクション読み込み | 読み込み                 | クライアント B は即読み込む                 |
+| クライアント A           | クライアント B           | 結果                                                                                |
+| :----------------------- | :----------------------- | :---------------------------------------------------------------------------------- |
+| トランザクション書き込み | トランザクション書き込み | どちらかのトランザクションが失敗し、再試行が必要になる可能性がある                  |
+| トランザクション書き込み | トランザクション読み込み | 読み込みトランザクションが失敗し、再試行が必要になる可能性がある                    |
+| トランザクション書き込み | 書き込み                 | クライアント B は即座に書き込むが、トランザクションの結果次第で最終的な状態が決まる |
+| トランザクション書き込み | 読み込み                 | クライアント B は即座に読み込むが、トランザクション完了前の状態を読む可能性がある   |
+| トランザクション読み込み | トランザクション書き込み | 書き込みトランザクションが失敗し、再試行が必要になる可能性がある                    |
+| トランザクション読み込み | トランザクション読み込み | 両方のトランザクションが成功する可能性が高いが、競合時は一方が失敗する可能性がある  |
+| トランザクション読み込み | 書き込み                 | クライアント B は即座に書き込む                                                     |
+| トランザクション読み込み | 読み込み                 | クライアント B は即座に読み込む。両操作とも成功する                                 |
+
+- DynamoDB のトランザションは内部的に楽観ロックを使用しているためロックの開放を待つことなく失敗する
+- 非トランザクション処理は即座に実行される
+- トランザクション同士の読み書きを同時に行うと楽観ロックによりエラーになる
+- トランザクションと非トランザクションの読み書きを同時に行っても楽観ロックエラーにならない
+
+## トランザクションの API
 
 - TransactionWriteItems
   - 複数の PutItem/UpdateItem/DeleteItem をトランザクションで実行可能
+  - 1 回の API 呼び出しで全ての操作が実行される
 - TransactionGetItems
   - 複数の GetItem をトランザクションで実行可能
+  - 1 回の API 呼び出しで全ての操作が実行される
 
 ## トランザクションの分離レベル
 
@@ -395,3 +404,246 @@ TTL を使用することで有効期限をすぎると数日以内にデータ�
 </table>
 
 TTL を過ぎても削除されていない項目を読み取りクエリから除外したい場合はフィルターを使用する
+
+### 6.多対多
+
+多対多の場合片方のエンティティーの ID を PK,もう一方のエンティティーの ID を SK としてもつ。グローバルセカンダリーインデックスを SK を PK に PK を SK にすることで多対多を表現できる。グラフのノードをエンティティー、エッジを関係とみなせば、両方のエンティティーに対して PK になるテーブルを作成すれば良いことがわかる。
+
+ユーザー/講座の多対多のテーブル
+
+<table>
+  <thead>
+    <th>PK(UserId)</th>
+    <th>SK(CourseId)</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="3">UserId01</td>
+      <td>Course01</td>
+    </tr>
+    <tr>
+      <td>Course02</td>
+    </tr>
+    <tr>
+      <td>Course03</td>
+    </tr>
+    <tr>
+      <td>UserId02</td>
+      <td>Course02</td>
+    </tr>
+  </tbody>
+</table>
+
+グローバルセカンダリーインデックス
+
+<table>
+  <thead>
+    <th>PK(CourseId)</th>
+    <th>SK(UserId)</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="2">Course01</td>
+      <td>UserId01</td>
+    </tr>
+    <tr>
+      <td>UserId02</td>
+    </tr>
+    <tr>
+      <td>Course02</td>
+      <td>UserId01</td>
+    </tr>
+   <tr>
+      <td>Course03</td>
+      <td>UserId01</td>
+    </tr>
+  </tbody>
+</table>
+
+`getCoursesByUser`はベーステーブルで`getUsersByCourse`はグローバルセカンダリーインデックスで対応できる。
+
+### 7.大きな項目（垂直パーティショニング）
+
+DynamoDB の項目の最大サイズは 400KB なので項目を小さなチャンクデータに分割して関連する全ての項目をパーティションキー値で関連付けて項目コレクションを作成する。
+
+分割前のテーブル
+
+| PK(UserId) | sessionId | Currency | Locale | AddressDelivery                     | AddressHome                        | first  | last | email            |
+| :--------- | :-------- | :------- | :----- | :---------------------------------- | :--------------------------------- | :----- | :--- | :--------------- |
+| 00001      | 2fbo70w   | JPY      | ja-jp  | {prefecture: Tokyo, city: Shinjuku} | {prefecture: Tokyo, city: Shibuya} | Ichiro | Sato | sato@example.com |
+
+分割後のテーブル
+
+<table>
+  <thead>
+    <th>PK(UserId)</th>
+    <th>SK</th>
+    <th colspan="3">Attributes</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="12">00001</td>
+      <td rowspan="2">M#Session#id</td>
+      <td>sessionId</td>
+      <td></td><td></td>
+    </tr>
+    <tr>
+      <td>2fbo70w</td>
+      <td></td><td></td>
+    </tr>
+    <tr>
+      <td rowspan="2">P#Currency</td>
+      <td>Value</td><td></td><td></td>
+    </tr>
+    <tr>
+      <td>JPY</td><td></td><td></td>
+    </tr>
+    <tr>
+      <td rowspan="2">P#Locale/td>
+      <td>Value</td><td></td><td></td>
+    </tr>
+    <tr>
+      <td>ja-jp</td><td></td><td></td>
+    </tr>
+    <tr>
+      <td rowspan="2">U#Address#Delivery</td>
+      <td>Prefecture</td>
+      <td>City</td><td></td>
+    </tr>
+    <tr>
+      <td>Tokyo</td>
+      <td>Shinjuku</td><td></td>
+    </tr>
+    <tr>
+      <td rowspan="2">U#Address#Home</td>
+      <td>Prefecture</td>
+      <td>City</td><td></td>
+    </tr>
+    <tr>
+      <td>Tokyo</td>
+      <td>Shibuya</td><td></td>
+    </tr>
+    <tr>
+      <td rowspan="2">U#Address#Information</td>
+      <td>first</td>
+      <td>last</td>
+      <td>email</td>
+    </tr>
+    <tr>
+      <td>Ichiro</td>
+      <td>Sato</td>
+      <td>sato@example.com</td>
+    </tr>
+  </tbody>
+</table>
+
+## 読み込み操作（DynamoDB API）
+
+### プロジェクション式(projection-expression)
+
+取得する属性を指定する
+
+```bash
+aws dynamodb get-item \
+    --table-name ProductCatalog \
+    --key '{"PK": {S: "001"}}' \
+    --projection-expression "Description, RelatedItems[0], ProductReviews.FiveStar"
+```
+
+### 属性値式(expression-attribute-values)
+
+SQL でいうとプレースホルダーの実際の値を定義する。プレフィックスとして`:`を付与する必要がある。
+
+```bash
+aws dynamodb scan \
+  --table-name ProductCatalog \
+  --filter-expression '{contains(Color, :c) and price <= :p}' \
+  --expression-attribute-values '{ ":c": {"S": "Black"}, ":p": {"N": 500} }'
+```
+
+### クエリの条件式
+
+`a = b`/`a < b`/`a > b`/`a <= b`/`a >= b`/`a BETWEEN b and c`/`begins_with(a, string)`がサポートされている
+
+```bash
+aws dynamodb query \
+  --table-name Reply \
+  --key-condition-expression "Id = :id and begins_with(ReplyDateTime, :dt)" \
+  --expression-attribute-values '{ ":id": {"S": "0001"}, ":dt": {"S": "2024-01"} }'
+```
+
+### クエリのフィルター式
+
+PK と SK を指定して Query を実行後にフィルター式で指定したフィルターを実行する。フィルター式は Query の完了後結果が返される前に適用される。
+
+```bash
+aws dynamodb query \
+  --table-name Thread \
+  --key-condition-expression 'ForumName = :fn and Subject = :sub' \
+  --filter-expression 'Views >= :num' \
+  --expression-attribute-values '{ ":fn": {"S": "DynamoDB"}, ":sub": {"S": "Thread1"}, ":num": {"N": 3} }'
+```
+
+### ソート
+
+`scan-index-forward`に Bool 値を指定することで SK でソートできる。
+
+- true: 昇順
+- false: 降順
+
+```bash
+aws dynamodb query \
+  --table-name Thread \
+  --key-condition-expression 'ForumName = :fn' \
+  --expression-attribute-values '{ ":fn": {"S": "DynamoDB"} }'
+  --scan-index-forward false
+```
+
+### 項目数指定
+
+`limit`に項目数を指定することで返却される結果の項目数を指定できる。Limit とフィルター式を併用した場合指定した Limit の数以下の項目数が返却される可能性がある。Limit は Query 実行時の項目数をしており、Query 実行後にフィルター式を実行すると項目数が減る可能性がある。
+
+```bash
+aws dynamodb query \
+  --table-name Thread \
+  --key-condition-expression 'ForumName = :fn' \
+  --expression-attribute-values '{ ":fn": {"S": "DynamoDB"} }'
+  --limit 10
+```
+
+### クエリ結果セットの最大サイズ
+
+クエリ結果セットの最大サイズは 1MB であるためクエリ結果を全ての取得するためには`lastEvaluatedKey`が Null になるまで繰り返し DynamoDB の API を呼び出す必要がある。
+
+以下のような処理を繰り返し処理する
+
+1. クエリを実行する
+2. 結果に LastEvaluatedKey 要素が含まれており、それが Null 以外の場合、ステップ 2 に進む。結果に LastEvaluatedKey がない場合、これ以上取得する項目はない。
+3. 以前のものと同じパラメータを使用して新しい Query リクエストを作成する。ただし、今回は、ステップ 1 から LastEvaluatedKey 値を取得して、新しい Query リクエストの ExclusiveStartKey パラメータとして使用する。
+
+### 条件式（演算子+関数）
+
+- `=` `<>` `<` `<=` `>` `>=`
+- IN
+- BETWEEN
+- `attribute_exists`/`attribute_not_exists`/`begins_with`/`contains`
+- NOT
+- AND
+- OR
+
+## 書き込み操作（DynamoDB API）
+
+### 更新式（updateItem）
+
+#### SET（属性の更新/追加）
+
+属性が存在しない場合は追加し、属性がすでに存在する場合は上書きする
+
+```bash
+aws dynamodb update-item \
+  --table-name ProductCatalog \
+  --key '{"id": {"N": 789}}' \
+  --update-expression 'SET ProductCategory = :c, Price = :p' \
+  --expression-attribute-values '{":c": {"S": "Hardware"}, ":p": {"N": "60"}}' \
+  --return-values ALL_NEW
+```
