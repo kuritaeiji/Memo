@@ -3,6 +3,13 @@
 - Lambda 関数は 1 コンテナで 1 つの関数しか実行しない。よって同時に 1000 のリクエストに対応する場合は 1000 個のコンテナが必要になる
 - Lambda 関数はコンテナをアイドルして再利用することもある（ウォームスタート）
 
+## APIGateway と CORS と Lambda プロキシ統合
+
+- lambda プロキシ統合: 。APIGateway はそのまま lambda にイベントを渡し、lambda から のレスポンスをそのまま返却する。sam テンプレートの Event を使用すると lambda プロキシ統合が選択される
+- lambda 非プロキシ統合: APIGateway がリクエストを加工して lambda に渡し、lambda からのスポんすを加工して返却する。
+
+AWS::Serverless::Api の CORS 設定をすべてのパスとメソッドに対して行う（OPTIONS メソッドにも適用）。ただし lambda プロキシ統合を使用すると APIGateway は lambda からのレスポンスをそのまま返すため CORS ヘッダーが付与されない。よって lambda 関数で CORS ヘッダーを付与する必要がある。ただしプリフライトリクエストに対しては APIGateway が CORS ヘッダーを自動的にレスポンスしてくれる。
+
 ## lmabda 関数のライフサイクル
 
 - コールドスタート（コンテナ作成） → 関数実行 → コンテナ破棄
