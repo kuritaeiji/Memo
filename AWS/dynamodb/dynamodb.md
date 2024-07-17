@@ -648,3 +648,26 @@ aws dynamodb update-item \
   --expression-attribute-values '{":c": {"S": "Hardware"}, ":p": {"N": "60"}}' \
   --return-values ALL_NEW
 ```
+
+## DynamoDBStreams
+
+![DynamoDBStreams](./images/DynamoDBStreams.png)
+
+DynamoDB Streams を有効化すると DynamoDB テーブル内の項目を変更するたびに DynamoDB Streams が項目を最大 24 時間ストリームに保存する。ストリームとはテーブル変更履歴を保存するためのログストレージのこと。また DynamoDBStreams のストリームへの書き込みをトリガーとして Lambda 関数を実行できる（DynamoDB テーブルへの書き込みをトリガーとして Lambda 関数を実行することが現在できない）。
+
+### オプション
+
+StreamSpecification（ストリームに保存する内容）
+
+- KEYS_ONLY: キー属性のみストリームに書き込む
+- NEW_IMAGE: 変更後の項目のみストリームに書き込む
+- OLD_IMAGE: 変更前の項目のみストリームに書き込む
+- NEW_AND_OLD_IMAGE: 変更前の項目/変更後の項目をストリームに書き込む
+
+cfn では DynamoDB テーブルの StreamSpecification を指定すると DynamoDBStreams が有効化される。他のオプションはないので新しく項目がされた場合のみ Stream がストリームに書き込むなどはできない。そのような要件を実現したい場合は Lambda 関数のフィルターオプションを使用する。
+
+### SDK
+
+DynamoDB API と DynamoDB Streams API は異なるため 2 つのクライアントをインスタンス化する必要がある。
+
+[DynamoDB Streams と Lambda の例](https://docs.aws.amazon.com/ja_jp/amazondynamodb/latest/developerguide/Streams.Lambda.Tutorial.html)
