@@ -666,6 +666,10 @@ StreamSpecification（ストリームに保存する内容）
 
 cfn では DynamoDB テーブルの StreamSpecification を指定すると DynamoDBStreams が有効化される。他のオプションはないので新しく項目がされた場合のみ Stream がストリームに書き込むなどはできない。そのような要件を実現したい場合は Lambda 関数のフィルターオプションを使用する。
 
+### TTL
+
+TTLを設定しているテーブルにDynamoDB Streamsを設定してストリームへの書き込みをトリガーとしてLambda関数を実行すると、有効期限切れの項目をバックアップ可能
+
 ### SDK
 
 DynamoDB API と DynamoDB Streams API は異なるため 2 つのクライアントをインスタンス化する必要がある。
