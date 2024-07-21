@@ -132,7 +132,21 @@ DynamoDB は書き込み API を呼び出してから少なくとも 2 つの AZ
 
 ## 条件式
 
-条件式に一致しない場合は書き込みクエリを失敗させることができる（RDB の排他制御の代わりに使用する）
+条件式に一致しない場合は書き込みクエリを失敗させることができる（RDB の排他制御の代わりに使用する）  
+`condition-expression`を使用して条件式を作成する。
+
+- 条件付きPutItem
+- 条件付きDeleteItem
+- 条件付きUpdateItem
+
+条件付きPutItem（同じプライマリーキーが存在しない場合のみ項目を作成する）
+
+```bash
+aws dynamodb put-item \
+    --table-name ProductCatalog \
+    --item file://item.json \
+    --condition-expression "attribute_not_exists(PK) AND attribute_not_exists(SK)"
+```
 
 ## トランザクション
 
@@ -664,7 +678,7 @@ StreamSpecification（ストリームに保存する内容）
 - OLD_IMAGE: 変更前の項目のみストリームに書き込む
 - NEW_AND_OLD_IMAGE: 変更前の項目/変更後の項目をストリームに書き込む
 
-cfn では DynamoDB テーブルの StreamSpecification を指定すると DynamoDBStreams が有効化される。他のオプションはないので新しく項目がされた場合のみ Stream がストリームに書き込むなどはできない。そのような要件を実現したい場合は Lambda 関数のフィルターオプションを使用する。
+cfn では DynamoDB テーブルの StreamSpecification を指定すると DynamoDBStreams が有効化される。他のオプションはないので新しく項目が作成された場合のみ Stream がストリームに書き込むなどはできない。そのような要件を実現したい場合は Lambda 関数のフィルターオプションを使用する。
 
 ### TTL
 
