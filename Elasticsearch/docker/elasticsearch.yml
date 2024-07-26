@@ -1,0 +1,10 @@
+cluster:
+  name: elasticsearch
+  initial_master_nodes: [192.168.10.1, 192.168.10.2, 192.168.10.3]
+network:
+  host: 0.0.0.0
+discovery:
+  seed_hosts: [192.168.10.1, 192.168.10.2, 192.168.10.3]
+node:
+  master: true
+  data: true
