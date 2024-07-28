@@ -1,6 +1,8 @@
 services:
   node1:
-    image: elasticsearch:7.6.2
+    build:
+      context: .
+      dockerfile: Dockerfile
     tty: true
     stdin_open: true
     networks:
@@ -10,7 +12,9 @@ services:
       - /usr/share/elasticsearch/data
       - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
   node2:
-    image: elasticsearch:7.6.2
+    build:
+      context: .
+      dockerfile: Dockerfile
     tty: true
     stdin_open: true
     networks:
@@ -20,7 +24,9 @@ services:
       - /usr/share/elasticsearch/data
       - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
   node3:
-    image: elasticsearch:7.6.2
+    build:
+      context: .
+      dockerfile: Dockerfile
     tty: true
     stdin_open: true
     networks:

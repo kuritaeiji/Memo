@@ -1,0 +1,423 @@
+# クエリ
+
+## クエリの実行
+
+クエリを実行するためには`_search`という API エンドポイントを使用する。複数のインデックスを横断して検索することも可能。
+
+| パス                         | 検索対象のインデックスの範囲                             |
+| :--------------------------- | :------------------------------------------------------- |
+| my_index1/\_search           | <my_index1>のみを対象に検索                              |
+| my_index1,my_index2/\_search | <my_index1>/<my_index2>の 2 つのインデックスを対象に検索 |
+| my_index\*/\_search          | <my_index>で始まるインデックス全てを対象に検索           |
+| \_search                     | クラスタ内の全てのインデックスを対象に検索               |
+
+## クエリ DSL
+
+クエリ DSL をリクエストボディーに記述して API を呼び出すことでドキュメントを検索する。
+
+```HTTP
+GET my_index/_search
+<クエリDSL>
+```
+
+クエリ DSL のシンタックス
+
+```JSON
+{
+  "query": {},
+  "from": 0,
+  "size": 10,
+  "sort": [],
+  "_source": []
+}
+```
+
+- query
+  - query 句には Elasticsearch に渡したいクエリの内容を JSON オブジェクトで記載する
+- from/size
+  - from/size 句はオプションで検索結果のページネーションを指定できる
+  - from のデフォルト値は 0。size のデフォルト値は 10。
+- sort
+  - sort 句はオプションで検索結果のソート方法を指定できる
+  - デフォルトはスコア順
+- \_source
+  - source 句はオプションで検索結果に含めるフィールドを指定できる
+  - デフォルトは格納されたフィールド値を全て含める
+
+## クエリ DSL の種類
+
+- 基本クエリ
+  - 全文検索クエリ
+  - Term レベルクエリ
+  - Range クエリ
+- 複合クエリ
+  - Bool クエリ
+
+複合クエリは複数の基本クエリを組み合わせて検索条件を構成できる。
+
+### 基本クエリ-全文検索クエリ
+
+#### match_all クエリ
+
+指定したインデックスのドキュメントを全て返すクエリ。ひど押した県連度を示す\_score の値も全件が 1.0 になる。match_all クエリは格納されたドキュメントの確認に使用される。
+
+```HTTP
+GET my_index/_search
+{
+  "query": {
+    "match_all": {}
+  }
+}
+```
+
+#### match クエリ
+
+match クエリは典型的な全文検索の用途で使用するクエリ。
+
+message フィールドに Elasticsearch が含まれているドキュメントを取得する例
+
+```JSON
+{
+  "query": {
+    "match": {
+      "message": {
+        "query": "Elasticsearch"
+      }
+    }
+  }
+}
+```
+
+検索キーワードを複数指定して or 検索する例
+
+```JSON
+{
+  "query": {
+    "match": {
+      "message": {
+        "query": "Elasticsearch Hello"
+      }
+    }
+  }
+}
+```
+
+検索キーワードを指定して and 検索する例
+
+```JSON
+{
+  "query": {
+    "match": {
+      "message": {
+        "query": "Elasticsearch Hello",
+        "operator": "and"
+      }
+    }
+  }
+}
+```
+
+指定した複数のキーワードの内 N 個以上のキーワードが含まれている検索をする例
+
+```JSON
+{
+  "query": {
+    "match": {
+      "message": {
+        "query": "Elasticsearch Hello World",
+        "minimum_should_match": 2
+      }
+    }
+  }
+}
+```
+
+#### match_phrase クエリ
+
+複数のキーワードを指定した際に指定された語順のドキュメントのみを検索する。
+
+```JSON
+{
+  "query": {
+    "match_phrase": {
+      "message": {
+        "query": "Tom Chased Jerry"
+      }
+    }
+  }
+}
+```
+
+### 基本クエリ-Term レベルクエリ
+
+Term レベルクエリは指定した検索キーワードに完全一致したフィールドを探す時に使用するクエリ。keyword 型や integer/float などの数値型や date/date_nanos などの日付型などに使用できる。
+text 型はアナライザーに単語分割処理を行って転置インデックスを構成するが、keyword 型はアナライザーによる単語分割処理が行われずにそのままインデックスが格納される。このため Term レベルクエリは格納されたドキュメントのフィールドと検索キーワードをそのまま比較する。
+
+#### Term クエリ
+
+完全一致検索を行うクエリ
+
+```JSON
+{
+  "query": {
+    "term": {
+      "message": {
+        "value": "New York"
+      }
+    }
+  }
+}
+```
+
+#### Terms クエリ
+
+Terms クエリは Term クエリと同様に完全一意検索を行うクエリだが検索キーワードを複数指定できる。複数指定したキーワードの内どれか 1 つでも一致すれば検索にヒットする。
+
+```JSON
+{
+  "query": {
+    "terms": {
+      "prefecture": ["Tokyo", "Kanagawa", "Chiba"]
+    }
+  }
+}
+```
+
+### 基本クエリ-Range クエリ
+
+主に数値型や非付け方のフィールドを対象として値の範囲検索を行うためのクエリ。
+
+```JSON
+{
+  "query": {
+    "range:" {
+      "price": {
+        "gte": 1000,
+        "lte": 2000
+      }
+    }
+  }
+}
+```
+
+Range クエリでは以下のオペレーターが使用可能。
+
+| オペレーター名 | 意味       |
+| :------------- | :--------- |
+| gte            | 以上       |
+| lte            | 以下       |
+| gt             | より大きい |
+| lt             | より小さい |
+
+### 複合クエリ-Bool クエリ
+
+Bool クエリは基本クエリを複数組み合わせて複合クエリを構成するための記法。Bool クエリの基本的なクエリ DSL のシンタックスは以下のようになる。
+
+```JSON
+{
+  "query": {
+    "bool": {
+      "must": [{}, {}],
+      "should": [{}, {}],
+      "must_not": [{}, {}],
+      "filter": [{}]
+    }
+  }
+}
+```
+
+- must クエリ
+  - 必ず含まれるべきクエリ条件を記載する
+  - must 区の中に複数の基本クエリを指定した場合は、全ての条件が満たされる必要がある（AND 条件）
+- should クエリ
+  - must クエリと一緒に使用する場合
+    - must 条件を満たすドキュメントのみ取得する
+    - should 条件がオプショナルでスコアを向上させるために使用される
+    - minimum_should_match パラメータを使用した場合は指定した数以上の should 条件に一致するドキュメントのみ取得する
+  - must クエリと一緒に使用しない場合（should クエリのみ使用する場合）
+    - should 条件に 1 つ以上一致するドキュメントのみ取得する
+    - 少なくとも 1 つの条件に一致するという意味で使用される（OR 条件）
+- must_not クエリ
+  - must_not 句の中に指定した基本クエリに当てはまるドキュメントは検索結果から除外される(NOT 条件)
+  - 基本クエリに当てはまったドキュメントを除外するだけなのでスコアは算出できない
+- filter クエリ
+  - filter 句の中に指定した基本クエリに当てはまるドキュメントのみ検索結果として取得する
+  - 検索条件にマッチするかしないかのみが返されるクエリなのでスコアは算出できない
+
+#### コンテキスト
+
+- Query コンテキスト
+  - must/should クエリ
+  - 検索条件の関連度に応じてスコアを返す
+- Filter コンテキスト
+  - must_not/filter クエリ
+  - 検索条件にマッチするかしないか（Yes か No か）が返される。
+
+#### must クエリ
+
+must 句の中に指定した複数の基本クエリは全て満たされる必要がある。AND 条件の指定と同じ意味を持つ。
+
+message フィールドに Elasticsearch を含みかつ username フィールドに Tanaka を含むドキュメントを取得する例
+
+```JSON
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { "message": "Elasticsearch" } },
+        { "match": { "username": "Tanaka" } }
+      ]
+    }
+  }
+}
+```
+
+#### should クエリ
+
+must クエリを使用せず should クエリのみ使用する場合はいずれかのクエリ条件を満たした場合のみドキュメントがヒットする。(OR 条件)  
+must クエリと should クエリを併用する場合は must クエリに一致するドキュメントを取得し、should クエリはスコアを向上させるためのみに使用される。
+
+should クエリのみ使用した場合の例（）
+
+```JSON
+{
+  "query": {
+    "bool": {
+      "should": [
+        { "match": { "message": "Elasticsearch" } },
+        { "match": { "username": "Tanaka" } }
+      ]
+    }
+  }
+}
+```
+
+message フィールドが Elasticsearch を含む or username フィールドが Tanaka を含むドキュメントを取得する
+
+must クエリと should クエリを併用した場合の例
+
+```JSON
+{
+  "query": {
+    "bool": {
+      "must": [{ "match": { "message": "Elasticsearch" } }],
+      "should": [{ "match": { "username": "Tanaka" } }]
+    }
+  }
+}
+```
+
+message フィールドが Elasticsearch を含むドキュメントを取得する。username フィールドに Tanaka を含む場合はスコアが高くなる。
+
+#### must_not クエリ
+
+must_not 句に指定した基本クエリに当てはまるドキュメントは検索結果から除外される。must/should で取得したドキュメントを除外する挙動になる。
+
+```JSON
+{
+  "query": {
+    "bool": {
+      "must_not": [
+        { "term": { "city": "Seattle" } }
+      ]
+    }
+  }
+}
+```
+
+#### filter クエリ
+
+Filter 句の中に指定した検索条件にマッチするドキュメントの絞り込みを行う。must/should で取得したドキュメントを絞り込む挙動になる。
+
+```JSON
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { "message": "Elasticsearch" } }
+      ],
+      "range": [
+        { "date": { "gte": "now-1w" } }
+      ]
+    }
+  }
+}
+```
+
+## クエリレスポンス
+
+```JSON
+{
+  "took" : 3,
+  "timed_out" : false,
+  "_shards" : {
+    "total" : 3,
+    "successful" : 3,
+    "skipped" : 0,
+    "failed" : 0
+  },
+  "hits" : {
+    "total" : {
+      "value" : 3,
+      "relation" : "eq"
+    },
+    "max_score" : 1.456388,
+    "hits" : [
+      {
+        "_index" : "my_index",
+        "_type" : "_doc",
+        "_id" : "jdsj85ABh4fFziSQ0uwx",
+        "_score" : 1.456388,
+        "_source" : {
+          "username" : "Grace Taylor",
+          "message" : "Just deployed my first Elasticsearch cluster",
+          "date" : "2024-07-27T17:00:00"
+        }
+      }
+    ]
+  }
+}
+```
+
+- took
+  - 検索にかかった ms
+- \_shards
+  - シャードに関わる情報を含む
+  - total: 検索対象のシャード数
+  - successful: 検索に成功したシャード数
+  - skipped: スキップされたシャード数
+  - failed: 失敗したシャード数
+- hits
+  - 検索結果の主要部分を含む
+  - total
+    - value: 検索結果に一致したドキュメントの総数
+  - max_score: 最も関連性の高いドキュメントのスコア
+  - hits
+    - 実際の検索結果ドキュメントの配列
+    - \_index: ドキュメントが帰属するインデックス
+    - \_type: ドキュメントのタイプ
+    - \_id: ドキュメント ID
+    - \_score: ドキュメントのスコア
+    - \_source: 実際のドキュメントデータ
+
+## インデックスの種類
+
+Elasticsearch は主に 2 種類のインデックスを使用する。転置インデックスと BKD ツリーを使用する
+
+- 転置インデックス
+  - text 型/keyword 型のフィールド型を定義するとフィールドごとに転置インデックスが作成される
+  - text 型
+    - Analyzer によって単語ごとに分割された転置インデックスが作成される
+    - match/match_phrase 検索のような全文検索で使用される
+  - keyword 型
+    - 分割されずそのままの文章として転置インデックスが作成される
+    - term/terms 検索のような完全一致検索で使用される
+- BKD ツリー
+  - Btree インデックスとほぼ同じ役割
+  - integer/long/float などの数値型と date/date_nanos のような日付型の場合に BKD ツリーが作成される
+  - term/terms 検索や Range 検索で使用される
+- doc_values
+  - 列指向のデータ構造
+  - ドキュメント ID 順に格納される
+  - ソート操作を高速化する
+  - integer 型の例: [1230, 134, 2050, 30000, 3456] 配列のようなもの
