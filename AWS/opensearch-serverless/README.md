@@ -95,3 +95,7 @@ Outputs:
 AWS アカウント、リージョン毎の全てのコレクションに対して同じ OCU を使用する。下図のように CollectionA と CollectionB に対する検索やインデクシングは同じ OCU を使用する。
 
 ![リソース](./images/OpenSearchServerlessリソース.png)
+
+## モニタリング/ログ
+
+OpenSearchServerless は 2024/09 時点でログ出力する機能がない。またモニタリングに関しても OCU の CPU/メモリ/ディスクの使用率を閲覧できない。ただし、OCU の使用率が 75%以上になった場合に EventBridge を用いて通知をすることはできる。
