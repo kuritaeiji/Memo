@@ -171,6 +171,19 @@ DynamoDB のトランザクションの分離レベルは Serializable。よっ�
 - トランザクション同士の読み書きを同時に行うと楽観ロックによりエラーになる
 - トランザクションと非トランザクションの読み書きを同時に行っても楽観ロックエラーにならない
 
+## 競合が発生するパターン
+
+1. 通常の書き込みが、別のトランザクション書き込みと競合する場合、TransactionConflictExceptionで失敗する。
+2. トランザクション書き込みが、別のトランザクション書き込みと競合する場合、TransactionCanceledExceptionで失敗する。
+3. トランザクション読み込みが、別のトランザクション書き込みまたは通常の書き込みと競合する場合、TransactionCanceledExceptionで失敗する。
+
+※通常の読み込みは失敗しない。
+
+通常の書き込み: PutItem,UpdateItem,DeleteItem  
+トランザクション書き込み: TransactWriteItems  
+通常の読み込み: Query,Get  
+トランザクション読み込み: TransactGetItems  
+
 ## トランザクションの API
 
 - TransactionWriteItems
